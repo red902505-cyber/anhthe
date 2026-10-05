@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tạo ảnh thẻ 3x4 / 4x6</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f3f5f7;
+      color: #222;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 28px auto;
+      padding: 0 16px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+    .head {
+      padding: 22px 24px;
+      background: linear-gradient(135deg, #8b0015, #c6102e);
+      color: white;
+    }
+    .head h1 { margin: 0 0 6px; font-size: 26px; }
+    .head p { margin: 0; opacity: .9; }
+    .content {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+      padding: 24px;
+    }
+    .panel {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 18px;
+      background: #fff;
+    }
+    .row { margin-bottom: 16px; }
+    label { display: block; font-weight: 700; margin-bottom: 7px; }
+    input[type="file"], select, input[type="range"] {
+      width: 100%;
+    }
+    select, input[type="file"] {
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 10px;
+      background: white;
+    }
+    .btns { display: grid; gap: 10px; }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .primary { background: #b30d2f; color: #fff; }
+    .secondary { background: #eef1f4; color: #111; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .hint {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+    .stage {
+      min-height: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #eef2f5;
+      border-radius: 14px;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+    }
+    canvas {
+      max-width: 100%;
+      max-height: 70vh;
+      box-shadow: 0 8px 24px rgba(0,0,0,.15);
+      background: #ddd;
+      cursor: grab;
+    }
+    canvas:active { cursor: grabbing; }
+    .empty {
+      color: #666;
+      text-align: center;
+      padding: 30px;
+    }
+    .status {
+      margin-top: 12px;
+      min-height: 20px;
+      font-size: 13px;
+      color: #555;
+    }
+    .badge {
+      display: inline-block;
+      padding: 5px 9px;
+      background: #fce7eb;
+      color: #9b0b2a;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+    .footer-note {
+      padding: 0 24px 24px;
+      font-size: 12px;
+      color: #777;
+    }
+    @media (max-width: 800px) {
+      .content { grid-template-columns: 1fr; }
+      .stage { min-height: 420px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="head">
+      <h1>📸 Tạo ảnh thẻ tự động</h1>
+      <p>Tải ảnh lên, tự căn khuôn mặt, chọn 3×4 hoặc 4×6 và lưu JPG.</p>
+    </div>
+
+    <div class="content">
+      <div class="panel">
+        <div class="row">
+          <label for="fileInput">1. Chọn ảnh</label>
+          <input id="fileInput" type="file" accept="image/*" />
+          <div class="hint">Ảnh chân dung rõ mặt sẽ cho kết quả tốt nhất.</div>
+        </div>
+
+        <div class="row">
+          <label for="sizeSelect">2. Kích thước ảnh thẻ</label>
+          <select id="sizeSelect">
+            <option value="3x4">3 × 4 cm</option>
+            <option value="4x6">4 × 6 cm</option>
+          </select>
+          <div class="badge" id="pixelInfo">900 × 1200 px</div>
+        </div>
+
+        <div class="row">
+          <label for="zoomRange">Phóng to / thu nhỏ</label>
+          <input id="zoomRange" type="range" min="0.7" max="2.3" value="1" step="0.01" />
+        </div>
+
+        <div class="row">
+          <label for="verticalRange">Vị trí khuôn mặt dọc</label>
+          <input id="verticalRange" type="range" min="-0.25" max="0.25" value="0" step="0.005" />
+          <div class="hint">Có thể kéo trực tiếp ảnh trên khung xem trước để tinh chỉnh.</div>
+        </div>
+
+        <div class="btns">
+          <button class="secondary" id="autoBtn" disabled>🎯 Tự căn giữa khuôn mặt</button>
+          <button class="secondary" id="resetBtn" disabled>↺ Đặt lại</button>
+          <button class="primary" id="saveBtn" disabled>💾 Lưu ảnh JPG</button>
+        </div>
+
+        <div class="status" id="status">Chưa có ảnh.</div>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="empty" id="empty">Chọn một ảnh để bắt đầu.</div>
+        <canvas id="preview" width="450" height="600" style="display:none"></canvas>
+      </div>
+    </div>
+    <div class="footer-note">
+      Xử lý được thực hiện ngay trên trình duyệt. Nếu trình duyệt hỗ trợ FaceDetector, hệ thống sẽ tự nhận diện khuôn mặt; nếu không, vẫn tự căn theo trung tâm ảnh và cho phép kéo/chỉnh thủ công.
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const fileInput = document.getElementById('fileInput');
+  const sizeSelect = document.getElementById('sizeSelect');
+  const zoomRange = document.getElementById('zoomRange');
+  const verticalRange = document.getElementById('verticalRange');
+  const autoBtn = document.getElementById('autoBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const status = document.getElementById('status');
+  const canvas = document.getElementById('preview');
+  const ctx = canvas.getContext('2d');
+  const empty = document.getElementById('empty');
+  const pixelInfo = document.getElementById('pixelInfo');
+
+  const outputSizes = {
+    '3x4': { w: 900, h: 1200, previewW: 450, previewH: 600, name: 'anh-the-3x4.jpg' },
+    '4x6': { w: 800, h: 1200, previewW: 400, previewH: 600, name: 'anh-the-4x6.jpg' }
+  };
+
+  let img = null;
+  let baseScale = 1;
+  let userZoom = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let detectedFace = null;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  function currentSize() {
+    return outputSizes[sizeSelect.value];
+  }
+
+  function updateCanvasSize() {
+    const s = currentSize();
+    canvas.width = s.previewW;
+    canvas.height = s.previewH;
+    pixelInfo.textContent = `${s.w} × ${s.h} px`;
+  }
+
+  function calcCoverScale() {
+    if (!img) return 1;
+    return Math.max(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+  }
+
+  function resetTransform() {
+    if (!img) return;
+    baseScale = calcCoverScale();
+    userZoom = 1;
+    zoomRange.value = '1';
+    verticalRange.value = '0';
+    offsetX = 0;
+    offsetY = 0;
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!img) return;
+
+    const scale = baseScale * userZoom;
+    const dw = img.naturalWidth * scale;
+    const dh = img.naturalHeight * scale;
+    const x = (canvas.width - dw) / 2 + offsetX;
+    const y = (canvas.height - dh) / 2 + offsetY + parseFloat(verticalRange.value) * canvas.height;
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, x, y, dw, dh);
+
+    // subtle guide lines
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(canvas.width/2, 0);
+    ctx.lineTo(canvas.width/2, canvas.height);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  async function detectAndCenterFace() {
+    if (!img) return;
+    status.textContent = 'Đang căn khuôn mặt...';
+
+    detectedFace = null;
+    try {
+      if ('FaceDetector' in window) {
+        const detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+        const faces = await detector.detect(img);
+        if (faces && faces.length) {
+          detectedFace = faces[0].boundingBox;
+        }
+      }
+    } catch (e) {
+      console.warn('FaceDetector error:', e);
+    }
+
+    baseScale = calcCoverScale();
+    userZoom = 1;
+    zoomRange.value = '1';
+    verticalRange.value = '0';
+
+    if (detectedFace) {
+      // Target: center face horizontally and place eyes/face slightly above center.
+      const faceCx = detectedFace.x + detectedFace.width / 2;
+      const faceCy = detectedFace.y + detectedFace.height / 2;
+
+      // Aim for face height around 43% of canvas height when possible.
+      const desiredFaceH = canvas.height * 0.43;
+      const faceScale = desiredFaceH / detectedFace.height;
+      const minCover = calcCoverScale();
+      baseScale = Math.max(minCover, faceScale);
+
+      const scaledFaceCx = faceCx * baseScale;
+      const scaledFaceCy = faceCy * baseScale;
+      const dw = img.naturalWidth * baseScale;
+      const dh = img.naturalHeight * baseScale;
+      const defaultX = (canvas.width - dw) / 2;
+      const defaultY = (canvas.height - dh) / 2;
+      const targetFaceX = canvas.width / 2;
+      const targetFaceY = canvas.height * 0.39;
+
+      offsetX = targetFaceX - (defaultX + scaledFaceCx);
+      offsetY = targetFaceY - (defaultY + scaledFaceCy);
+      status.textContent = '✅ Đã nhận diện và căn giữa khuôn mặt. Bạn có thể kéo ảnh để tinh chỉnh.';
+    } else {
+      offsetX = 0;
+      offsetY = -canvas.height * 0.03;
+      status.textContent = 'ℹ️ Trình duyệt không nhận diện được khuôn mặt. Đã căn theo trung tâm ảnh; bạn có thể kéo để chỉnh.';
+    }
+    draw();
+  }
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Vui lòng chọn tệp hình ảnh.');
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = async () => {
+      img = image;
+      updateCanvasSize();
+      empty.style.display = 'none';
+      canvas.style.display = 'block';
+      autoBtn.disabled = false;
+      resetBtn.disabled = false;
+      saveBtn.disabled = false;
+      resetTransform();
+      await detectAndCenterFace();
+      URL.revokeObjectURL(url);
+    };
+    image.onerror = () => {
+      alert('Không đọc được ảnh. Vui lòng thử ảnh khác.');
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  });
+
+  sizeSelect.addEventListener('change', async () => {
+    updateCanvasSize();
+    if (img) await detectAndCenterFace();
+  });
+
+  zoomRange.addEventListener('input', () => {
+    userZoom = parseFloat(zoomRange.value);
+    draw();
+  });
+
+  verticalRange.addEventListener('input', draw);
+  autoBtn.addEventListener('click', detectAndCenterFace);
+  resetBtn.addEventListener('click', resetTransform);
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!img) return;
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    offsetX += dx;
+    offsetY += dy;
+    draw();
+  });
+
+  canvas.addEventListener('pointerup', () => dragging = false);
+  canvas.addEventListener('pointercancel', () => dragging = false);
+
+  saveBtn.addEventListener('click', () => {
+    if (!img) return;
+    const s = currentSize();
+    const out = document.createElement('canvas');
+    out.width = s.w;
+    out.height = s.h;
+    const octx = out.getContext('2d');
+
+    const ratioX = s.w / canvas.width;
+    const ratioY = s.h / canvas.height;
+    const scale = baseScale * userZoom;
+    const dw = img.naturalWidth * scale;
+    const dh = img.naturalHeight * scale;
+    const x = (canvas.width - dw) / 2 + offsetX;
+    const y = (canvas.height - dh) / 2 + offsetY + parseFloat(verticalRange.value) * canvas.height;
+
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = 'high';
+    octx.drawImage(img, x * ratioX, y * ratioY, dw * ratioX, dh * ratioY);
+
+    out.toBlob((blob) => {
+      if (!blob) return;
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = s.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      status.textContent = `✅ Đã tạo ${s.name}`;
+    }, 'image/jpeg', 0.95);
+  });
+
+  updateCanvasSize();
+})();
+</script>
+</body>
+</html>
